@@ -1,0 +1,11 @@
+Error: {"type":"api_error","message":"Internal server error"}
+    at file:///Users/mattvollmer/.bun/install/global/node_modules/ai/dist/index.mjs:3798:50
+    at runUpdateMessageJob (file:///Users/mattvollmer/.bun/install/global/node_modules/ai/dist/index.mjs:10365:16)
+    at Object.transform (file:///Users/mattvollmer/.bun/install/global/node_modules/ai/dist/index.mjs:3415:15)
+    at invokePromiseCallback (node:internal/webstreams/util:172:10)
+    at Object.<anonymous> (node:internal/webstreams/util:177:23)
+    at transformStreamDefaultControllerPerformTransform (node:internal/webstreams/transformstream:527:37)
+    at transformStreamDefaultSinkWriteAlgorithm (node:internal/webstreams/transformstream:573:10)
+    at node:internal/webstreams/transformstream:378:16
+    at writableStreamDefaultControllerProcessWrite (node:internal/webstreams/writablestream:1129:5)
+    at writableStreamDefaultControllerAdvanceQueueIfNeeded (node:internal/webstreams/writablestream:1255:5)
