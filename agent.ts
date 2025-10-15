@@ -188,26 +188,33 @@ agent.on("chat", async ({ messages }) => {
 
         const hits =
           mode === "light"
-            ? filtered.map((h: any) => ({
-                url: h.url as string,
-                title: hierarchyTitle(h.hierarchy),
-                snippet: stripHtml(
-                  h._snippetResult?.content?.value as string | undefined,
-                  200
-                ),
-                objectID: h.objectID as string,
-              }))
-            : filtered.map((h: any) => ({
-                url: h.url as string,
-                hierarchy: h.hierarchy,
-                content: h.content as string | undefined,
-                snippet: stripHtml(
-                  h._snippetResult?.content?.value as string | undefined,
-                  300
-                ),
-                type: h.type as string | undefined,
-                objectID: h.objectID as string,
-              }));
+            ? filtered.map((h: any) => {
+                const title = hierarchyTitle(h.hierarchy) ?? "(No title)";
+                return {
+                  url: h.url as string,
+                  title,
+                  snippet: stripHtml(
+                    h._snippetResult?.content?.value as string | undefined,
+                    200
+                  ),
+                  objectID: h.objectID as string,
+                };
+              })
+            : filtered.map((h: any) => {
+                const title = hierarchyTitle(h.hierarchy) ?? "(No title)";
+                return {
+                  url: h.url as string,
+                  title,
+                  hierarchy: h.hierarchy,
+                  content: h.content as string | undefined,
+                  snippet: stripHtml(
+                    h._snippetResult?.content?.value as string | undefined,
+                    300
+                  ),
+                  type: h.type as string | undefined,
+                  objectID: h.objectID as string,
+                };
+              });
 
         return {
           available: true as const,
@@ -289,29 +296,40 @@ agent.on("chat", async ({ messages }) => {
         if (!res.ok) throw new Error(`Algolia error ${res.status}`);
         const data: any = await res.json();
         const rawHits = (data.hits ?? []) as any[];
+        // Filter out any hits without valid URLs
+        const filtered = rawHits.filter(
+          (h) => typeof h.url === "string" && h.url.trim() !== ""
+        );
 
         const hits =
           mode === "light"
-            ? rawHits.map((h: any) => ({
-                url: h.url as string,
-                title: hierarchyTitle(h.hierarchy),
-                snippet: stripHtml(
-                  h._snippetResult?.content?.value as string | undefined,
-                  200
-                ),
-                objectID: h.objectID as string,
-              }))
-            : rawHits.map((h: any) => ({
-                url: h.url as string,
-                hierarchy: h.hierarchy,
-                content: h.content as string | undefined,
-                snippet: stripHtml(
-                  h._snippetResult?.content?.value as string | undefined,
-                  300
-                ),
-                type: h.type as string | undefined,
-                objectID: h.objectID as string,
-              }));
+            ? filtered.map((h: any) => {
+                const title = hierarchyTitle(h.hierarchy) ?? "(No title)";
+                return {
+                  url: h.url as string,
+                  title,
+                  snippet: stripHtml(
+                    h._snippetResult?.content?.value as string | undefined,
+                    200
+                  ),
+                  objectID: h.objectID as string,
+                };
+              })
+            : filtered.map((h: any) => {
+                const title = hierarchyTitle(h.hierarchy) ?? "(No title)";
+                return {
+                  url: h.url as string,
+                  title,
+                  hierarchy: h.hierarchy,
+                  content: h.content as string | undefined,
+                  snippet: stripHtml(
+                    h._snippetResult?.content?.value as string | undefined,
+                    300
+                  ),
+                  type: h.type as string | undefined,
+                  objectID: h.objectID as string,
+                };
+              });
 
         return {
           available: true as const,
@@ -662,6 +680,13 @@ Your main job is to help users find and understand content from Coder's blog and
 2. Present titles/URLs from search results
 3. Only fetch full content if user requests it
 
+## CRITICAL: URL Formatting Rules
+- ONLY use URLs that are explicitly returned in tool results
+- NEVER construct, guess, or infer URLs
+- If a tool returns a title without a URL, present it as plain text without a link
+- When formatting links, use the EXACT url field from the tool result: [title](url)
+- Do NOT use objectID as a URL - it is only an internal identifier
+
 ## Non-Support Agent
 You are NOT a support agent. For technical support:
 - Coder customers: Contact your Coder account team
@@ -678,7 +703,7 @@ You are NOT a support agent. For technical support:
 
 ## Formatting Rules:
 - NO tables - use bullet points, numbered lists, or prose
-- ALWAYS format links as [text](URL)
+- ALWAYS format links as [text](URL) using exact URLs from tool results
 - Match user's communication style (formal/informal)
 - Be concise: 3-5 key points for summaries
 - Use clear, accessible language
