@@ -227,7 +227,7 @@ agent.on("chat", async ({ messages }) => {
     }),
     search_blog: tool({
       description:
-        "[FAST] Search Coder's blog posts via Algolia. Use this to find blog articles and announcements. Returns results quickly. Mode 'light' (default) returns url/title/snippet only; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
+        "[FAST] Search Coder's blog posts via Algolia. Use this to find blog articles and announcements. Returns results quickly. Mode 'light' (default) returns url/title/snippet/author/date; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
       inputSchema: z.object({
         query: z.string(),
         page: z.number().int().min(0).optional(),
@@ -272,8 +272,8 @@ agent.on("chat", async ({ messages }) => {
           hitsPerPage,
           attributesToRetrieve:
             mode === "light"
-              ? ["url", "hierarchy", "type"]
-              : ["url", "hierarchy", "content", "type"],
+              ? ["url", "slug", "hierarchy", "type", "title", "description", "author", "date", "publishedDate"]
+              : ["url", "slug", "hierarchy", "content", "type", "title", "description", "author", "date", "publishedDate"],
           facetFilters: baseFacetFilters,
           filters: input.filters,
         };
@@ -296,36 +296,48 @@ agent.on("chat", async ({ messages }) => {
         if (!res.ok) throw new Error(`Algolia error ${res.status}`);
         const data: any = await res.json();
         const rawHits = (data.hits ?? []) as any[];
-        // Filter out any hits without valid URLs
-        const filtered = rawHits.filter(
-          (h) => typeof h.url === "string" && h.url.trim() !== ""
-        );
+        // Blog posts may use 'url', 'slug', or 'objectID'
+        const filtered = rawHits.filter((h) => {
+          // Accept hits that have url, slug, objectID, or hierarchy information
+          return h.url || h.slug || h.objectID || h.hierarchy;
+        });
 
         const hits =
           mode === "light"
             ? filtered.map((h: any) => {
-                const title = hierarchyTitle(h.hierarchy) ?? "(No title)";
+                // Try multiple sources for title
+                const title = h.title ?? hierarchyTitle(h.hierarchy) ?? "(No title)";
+                // Try multiple sources for description/snippet
+                const snippet = h.description ?? stripHtml(
+                  h._snippetResult?.content?.value as string | undefined,
+                  200
+                );
+                // Construct URL from available data
+                const url = h.url ?? (h.slug ? `https://coder.com/blog/${h.slug}` : h.objectID);
                 return {
-                  url: h.url as string,
+                  url,
                   title,
-                  snippet: stripHtml(
-                    h._snippetResult?.content?.value as string | undefined,
-                    200
-                  ),
+                  snippet,
+                  author: h.author as string | undefined,
+                  date: h.date ?? h.publishedDate as string | undefined,
                   objectID: h.objectID as string,
                 };
               })
             : filtered.map((h: any) => {
-                const title = hierarchyTitle(h.hierarchy) ?? "(No title)";
+                const title = h.title ?? hierarchyTitle(h.hierarchy) ?? "(No title)";
+                const snippet = h.description ?? stripHtml(
+                  h._snippetResult?.content?.value as string | undefined,
+                  300
+                );
+                const url = h.url ?? (h.slug ? `https://coder.com/blog/${h.slug}` : h.objectID);
                 return {
-                  url: h.url as string,
+                  url,
                   title,
                   hierarchy: h.hierarchy,
                   content: h.content as string | undefined,
-                  snippet: stripHtml(
-                    h._snippetResult?.content?.value as string | undefined,
-                    300
-                  ),
+                  snippet,
+                  author: h.author as string | undefined,
+                  date: h.date ?? h.publishedDate as string | undefined,
                   type: h.type as string | undefined,
                   objectID: h.objectID as string,
                 };
