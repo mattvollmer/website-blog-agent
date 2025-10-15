@@ -67,6 +67,18 @@ function isBlogUrl(url: string) {
   }
 }
 
+function isDocsUrl(url: string) {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname === "coder.com" || u.hostname.endsWith(".coder.com")) &&
+      (u.pathname === "/docs" || u.pathname.startsWith("/docs/"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 function stripHtml(input: string | undefined, max = 220): string | undefined {
   if (!input) return undefined;
   const s = input
@@ -88,9 +100,127 @@ const agent = blink.agent();
 agent.on("chat", async ({ messages }) => {
   const tools = {
     ...webSearch.tools,
+    search_docs: tool({
+      description:
+        "[FAST] Search Coder's documentation via Algolia. Use this to find docs pages, guides, and technical reference material. Returns results quickly. Mode 'light' (default) returns url/title/snippet only; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
+      inputSchema: z.object({
+        query: z.string(),
+        page: z.number().int().min(0).optional(),
+        hitsPerPage: z.number().int().min(1).max(10).optional(),
+        facetFilters: z
+          .array(z.union([z.string(), z.array(z.string())]))
+          .optional(),
+        filters: z.string().optional(),
+        mode: z.enum(["light", "full"]).optional(),
+      }),
+      execute: async (input: {
+        query: string;
+        page?: number;
+        hitsPerPage?: number;
+        facetFilters?: (string | string[])[];
+        filters?: string;
+        mode?: "light" | "full";
+      }) => {
+        const appId = process.env.ALGOLIA_APP_ID as string | undefined;
+        const apiKey = process.env.ALGOLIA_SEARCH_KEY as string | undefined;
+        const indexName = "docs";
+        if (!appId || !apiKey) {
+          return {
+            available: false as const,
+            reason:
+              "Missing Algolia env: ALGOLIA_APP_ID, ALGOLIA_SEARCH_KEY",
+          };
+        }
+        const mode = input.mode ?? "light";
+        const hitsPerPage = Math.min(input.hitsPerPage ?? 3, 5);
+
+        // Ensure we only search v2-tagged docs by default
+        const baseFacetFilters: (string | string[])[] = [];
+        if (input.facetFilters && Array.isArray(input.facetFilters)) {
+          for (const ff of input.facetFilters) baseFacetFilters.push(ff);
+        }
+        // Add an AND filter for tags:v2 if not already present
+        const hasV2 = baseFacetFilters.some((ff) => {
+          if (typeof ff === "string") return ff === "tags:v2";
+          return ff.includes("tags:v2");
+        });
+        if (!hasV2) baseFacetFilters.push("tags:v2");
+        // Add an AND filter for version:main if not already present
+        const hasMain = baseFacetFilters.some((ff) => {
+          if (typeof ff === "string") return ff === "version:main";
+          return ff.includes("version:main");
+        });
+        if (!hasMain) baseFacetFilters.push("version:main");
+
+        const body: any = {
+          query: input.query,
+          page: input.page ?? 0,
+          hitsPerPage,
+          attributesToRetrieve:
+            mode === "light"
+              ? ["url", "hierarchy", "type"]
+              : ["url", "hierarchy", "content", "type"],
+          facetFilters: baseFacetFilters,
+          filters: input.filters,
+        };
+        if (mode === "full") body.attributesToSnippet = ["content:40"];
+
+        const res = await fetch(
+          `https://${appId}-dsn.algolia.net/1/indexes/${encodeURIComponent(
+            indexName
+          )}/query`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Algolia-Application-Id": appId,
+              "X-Algolia-API-Key": apiKey,
+            },
+            body: JSON.stringify(body),
+          }
+        );
+        if (!res.ok) throw new Error(`Algolia error ${res.status}`);
+        const data: any = await res.json();
+        const rawHits = (data.hits ?? []) as any[];
+        const filtered = rawHits.filter(
+          (h) => typeof h.url === "string" && isDocsUrl(h.url)
+        );
+
+        const hits =
+          mode === "light"
+            ? filtered.map((h: any) => ({
+                url: h.url as string,
+                title: hierarchyTitle(h.hierarchy),
+                snippet: stripHtml(
+                  h._snippetResult?.content?.value as string | undefined,
+                  200
+                ),
+                objectID: h.objectID as string,
+              }))
+            : filtered.map((h: any) => ({
+                url: h.url as string,
+                hierarchy: h.hierarchy,
+                content: h.content as string | undefined,
+                snippet: stripHtml(
+                  h._snippetResult?.content?.value as string | undefined,
+                  300
+                ),
+                type: h.type as string | undefined,
+                objectID: h.objectID as string,
+              }));
+
+        return {
+          available: true as const,
+          hits,
+          page: data.page as number,
+          nbPages: data.nbPages as number,
+          nbHits: data.nbHits as number,
+        };
+      },
+    }),
     search_blog: tool({
       description:
-        "[FAST] Search Coder's blog posts via Algolia. Use this as your PRIMARY tool to find blog articles. Returns results quickly. Mode 'light' (default) returns url/title/snippet only; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
+        "[FAST] Search Coder's blog posts via Algolia. Use this to find blog articles and announcements. Returns results quickly. Mode 'light' (default) returns url/title/snippet only; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
       inputSchema: z.object({
         query: z.string(),
         page: z.number().int().min(0).optional(),
@@ -492,39 +622,45 @@ agent.on("chat", async ({ messages }) => {
 
   return streamText({
     model: blink.model("anthropic/claude-sonnet-4.5"),
-    system: `You are a reading assistant for Coder, optimized for FAST blog post summarization and analysis.
+    system: `You are a reading assistant for Coder, optimized for FAST content search and summarization.
 
-## PRIMARY PURPOSE: Blog Summarization
-Your main job is to quickly summarize Coder blog posts. Secondary use cases include finding related content and analyzing specific sections.
+## PRIMARY PURPOSE: Content Discovery & Summarization
+Your main job is to help users find and understand content from Coder's blog and documentation. You can quickly search both sources and provide summaries.
 
 ## Tool Performance & Usage Rules:
 
 **FAST tools (use freely):**
-- search_blog: Your PRIMARY tool - searches blog instantly
+- search_docs: Search Coder documentation instantly
+- search_blog: Search Coder blog posts instantly
 - sitemap_list: Lists all website URLs
 - page_outline: Gets blog structure (headings, links)
-- web_search: Search the web for general information outside of Coder blog content
+- web_search: Search the web for general information outside of Coder content
 
 **SLOW tools (ALWAYS ask permission first):**
 - fetch_url: Fetches full page content (any URL)
 - page_section: Fetches specific blog section content
 
-## Workflow for Blog Summarization:
+## Workflow for Content Discovery:
 
-**For quick summaries:**
+**For documentation queries:**
+1. Use search_docs (mode: light) to find relevant docs
+2. Present results with titles/URLs
+3. Only fetch full content if user requests it
+
+**For blog summaries:**
 1. Use search_blog (mode: light) to find the post
 2. Use page_outline to see structure
 3. Ask if user wants full content before using page_section
 
+**For general questions:**
+1. Determine if the query is about docs (technical how-to, configuration, setup) or blog (announcements, use cases, stories)
+2. Use search_docs for technical questions, search_blog for announcements/content
+3. You can search both if unclear which is more relevant
+
 **For related content:**
-1. Use search_blog to find relevant articles
+1. Use search_docs and/or search_blog to find relevant content
 2. Present titles/URLs from search results
 3. Only fetch full content if user requests it
-
-**For specific questions:**
-1. Try search_blog first (snippets may have the answer)
-2. Use page_outline to locate relevant section
-3. Ask permission before using page_section to read full section
 
 ## Non-Support Agent
 You are NOT a support agent. For technical support:
@@ -534,7 +670,7 @@ You are NOT a support agent. For technical support:
 - Docs: https://coder.com/docs
 
 ## Response Length Guidelines:
-**When summarizing blog posts:**
+**When summarizing content:**
 - Keep your INITIAL response to 100 words or less
 - Provide a concise summary with the most important points
 - After your summary, ALWAYS ask: "Would you like more details?"
