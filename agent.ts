@@ -102,7 +102,7 @@ agent.on("chat", async ({ messages }) => {
     ...webSearch.tools,
     search_docs: tool({
       description:
-        "[FAST] Search Coder's documentation via Algolia. Use this to find docs pages, guides, and technical reference material. Returns results quickly. Mode 'light' (default) returns url/title/snippet only; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
+        "Search Coder's documentation via Algolia. Use this to find docs pages, guides, and technical reference material. Mode 'light' (default) returns url/title/snippet only; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
       inputSchema: z.object({
         query: z.string(),
         page: z.number().int().min(0).optional(),
@@ -227,7 +227,7 @@ agent.on("chat", async ({ messages }) => {
     }),
     search_blog: tool({
       description:
-        "[FAST] Search Coder's blog posts via Algolia. Use this to find blog articles and announcements. Returns results quickly. Mode 'light' (default) returns url/title/snippet/author/date; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
+        "Search Coder's blog posts via Algolia. Use this to find blog articles and announcements. Mode 'light' (default) returns url/title/snippet/author/date; 'full' returns additional hierarchy/content - only use 'full' if you need deep content analysis, not for basic searches.",
       inputSchema: z.object({
         query: z.string(),
         page: z.number().int().min(0).optional(),
@@ -354,7 +354,7 @@ agent.on("chat", async ({ messages }) => {
     }),
     sitemap_list: tool({
       description:
-        "[FAST] Fetch and flatten sitemap URLs (default https://coder.com/sitemap.xml) from the entire coder.com domain. Use this to get a list of URLs, including blog posts, case studies, docs, etc.",
+        "Fetch and flatten sitemap URLs (default https://coder.com/sitemap.xml) from the entire coder.com domain. Use this to get a list of URLs, including blog posts, case studies, docs, etc.",
       inputSchema: z.object({
         sitemapUrl: z.string().url().optional(),
         include: z.array(z.string()).optional(),
@@ -386,7 +386,7 @@ agent.on("chat", async ({ messages }) => {
     }),
     page_outline: tool({
       description:
-        "[FAST] Fetch a blog page and return title and outline (h1–h3 + anchors + internal links). Use this to understand blog post structure without reading full content.",
+        "Fetch a blog page and return title and outline (h1–h3 + anchors + internal links). Use this to understand blog post structure without reading full content.",
       inputSchema: z.object({ url: z.string().url() }),
       execute: async ({ url }: { url: string }) => {
         const res = await fetch(url, { redirect: "follow" });
@@ -436,7 +436,7 @@ agent.on("chat", async ({ messages }) => {
     }),
     fetch_url: tool({
       description:
-        "[SLOW - ASK FIRST] Fetch and parse any web page and extract full text content. This is slower than other tools. ALWAYS ask the user for approval before using this tool. Use this only when: 1) User explicitly asks you to read a specific URL, 2) User approves fetching after you explain it will take time. Do NOT use this for coder.com/blog posts - use page_section or search_blog instead.",
+        "Fetch and parse any web page and extract full text content. Use this when you need to read the actual detailed content of any web page. Do NOT use this for coder.com/blog posts - use page_section or search_blog instead.",
       inputSchema: z.object({
         url: z.string().url(),
         maxChars: z.number().int().min(100).max(50000).optional(),
@@ -535,7 +535,7 @@ agent.on("chat", async ({ messages }) => {
     }),
     page_section: tool({
       description:
-        "[SLOW - ASK FIRST] Fetch and return the full content of a specific blog page section. This is slower than other tools. ALWAYS ask the user for approval before using this tool. Use this when you need to read the actual detailed content of a blog section to answer questions or provide summaries. If user just wants an overview, use page_outline instead.",
+        "Fetch and return the full content of a specific blog page section. Use this when you need to read the actual detailed content of a blog section to answer questions or provide summaries. If user just wants an overview, use page_outline instead.",
       inputSchema: z.object({
         url: z.string().url(),
         anchorId: z.string().optional(),
@@ -652,35 +652,33 @@ agent.on("chat", async ({ messages }) => {
 
   return streamText({
     model: blink.model("anthropic/claude-sonnet-4.5"),
-    system: `You are a reading assistant for Coder, optimized for FAST content search and summarization.
+    system: `You are a reading assistant for Coder, optimized for content search and summarization.
 
 ## PRIMARY PURPOSE: Content Discovery & Summarization
-Your main job is to help users find and understand content from Coder's blog and documentation. You can quickly search both sources and provide summaries.
+Your main job is to help users find and understand content from Coder's blog and documentation. You can search both sources and provide summaries.
 
-## Tool Performance & Usage Rules:
-
-**FAST tools (use freely):**
-- search_docs: Search Coder documentation instantly
-- search_blog: Search Coder blog posts instantly
+## Available Tools:
+- search_docs: Search Coder documentation
+- search_blog: Search Coder blog posts
 - sitemap_list: Lists all website URLs
 - page_outline: Gets blog structure (headings, links)
-- web_search: Search the web for general information outside of Coder content
-
-**SLOW tools (ALWAYS ask permission first):**
 - fetch_url: Fetches full page content (any URL)
 - page_section: Fetches specific blog section content
+- web_search: Search the web for general information outside of Coder content
+
+Use the appropriate tool based on what information you need to answer the user's question.
 
 ## Workflow for Content Discovery:
 
 **For documentation queries:**
 1. Use search_docs (mode: light) to find relevant docs
 2. Present results with titles/URLs
-3. Only fetch full content if user requests it
+3. If you need more details to answer the question, use the appropriate tool to fetch full content
 
 **For blog summaries:**
 1. Use search_blog (mode: light) to find the post
 2. Use page_outline to see structure
-3. Ask if user wants full content before using page_section
+3. If you need the full content to provide a complete answer, use page_section
 
 **For general questions:**
 1. Determine if the query is about docs (technical how-to, configuration, setup) or blog (announcements, use cases, stories)
@@ -690,7 +688,7 @@ Your main job is to help users find and understand content from Coder's blog and
 **For related content:**
 1. Use search_docs and/or search_blog to find relevant content
 2. Present titles/URLs from search results
-3. Only fetch full content if user requests it
+3. If you need more details to answer the question, fetch full content as needed
 
 ## CRITICAL: URL Formatting Rules
 - ONLY use URLs that are explicitly returned in tool results
