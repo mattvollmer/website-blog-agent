@@ -127,8 +127,7 @@ agent.on("chat", async ({ messages }) => {
         if (!appId || !apiKey) {
           return {
             available: false as const,
-            reason:
-              "Missing Algolia env: ALGOLIA_APP_ID, ALGOLIA_SEARCH_KEY",
+            reason: "Missing Algolia env: ALGOLIA_APP_ID, ALGOLIA_SEARCH_KEY",
           };
         }
         const mode = input.mode ?? "light";
@@ -272,8 +271,29 @@ agent.on("chat", async ({ messages }) => {
           hitsPerPage,
           attributesToRetrieve:
             mode === "light"
-              ? ["url", "slug", "hierarchy", "type", "title", "description", "author", "date", "publishedDate"]
-              : ["url", "slug", "hierarchy", "content", "type", "title", "description", "author", "date", "publishedDate"],
+              ? [
+                  "url",
+                  "slug",
+                  "hierarchy",
+                  "type",
+                  "title",
+                  "description",
+                  "author",
+                  "date",
+                  "publishedDate",
+                ]
+              : [
+                  "url",
+                  "slug",
+                  "hierarchy",
+                  "content",
+                  "type",
+                  "title",
+                  "description",
+                  "author",
+                  "date",
+                  "publishedDate",
+                ],
           facetFilters: baseFacetFilters,
           filters: input.filters,
         };
@@ -306,30 +326,40 @@ agent.on("chat", async ({ messages }) => {
           mode === "light"
             ? filtered.map((h: any) => {
                 // Try multiple sources for title
-                const title = h.title ?? hierarchyTitle(h.hierarchy) ?? "(No title)";
+                const title =
+                  h.title ?? hierarchyTitle(h.hierarchy) ?? "(No title)";
                 // Try multiple sources for description/snippet
-                const snippet = h.description ?? stripHtml(
-                  h._snippetResult?.content?.value as string | undefined,
-                  200
-                );
+                const snippet =
+                  h.description ??
+                  stripHtml(
+                    h._snippetResult?.content?.value as string | undefined,
+                    200
+                  );
                 // Construct URL from available data
-                const url = h.url ?? (h.slug ? `https://coder.com/blog/${h.slug}` : h.objectID);
+                const url =
+                  h.url ??
+                  (h.slug ? `https://coder.com/blog/${h.slug}` : h.objectID);
                 return {
                   url,
                   title,
                   snippet,
                   author: h.author as string | undefined,
-                  date: h.date ?? h.publishedDate as string | undefined,
+                  date: h.date ?? (h.publishedDate as string | undefined),
                   objectID: h.objectID as string,
                 };
               })
             : filtered.map((h: any) => {
-                const title = h.title ?? hierarchyTitle(h.hierarchy) ?? "(No title)";
-                const snippet = h.description ?? stripHtml(
-                  h._snippetResult?.content?.value as string | undefined,
-                  300
-                );
-                const url = h.url ?? (h.slug ? `https://coder.com/blog/${h.slug}` : h.objectID);
+                const title =
+                  h.title ?? hierarchyTitle(h.hierarchy) ?? "(No title)";
+                const snippet =
+                  h.description ??
+                  stripHtml(
+                    h._snippetResult?.content?.value as string | undefined,
+                    300
+                  );
+                const url =
+                  h.url ??
+                  (h.slug ? `https://coder.com/blog/${h.slug}` : h.objectID);
                 return {
                   url,
                   title,
@@ -337,7 +367,7 @@ agent.on("chat", async ({ messages }) => {
                   content: h.content as string | undefined,
                   snippet,
                   author: h.author as string | undefined,
-                  date: h.date ?? h.publishedDate as string | undefined,
+                  date: h.date ?? (h.publishedDate as string | undefined),
                   type: h.type as string | undefined,
                   objectID: h.objectID as string,
                 };
@@ -651,7 +681,7 @@ agent.on("chat", async ({ messages }) => {
   };
 
   return streamText({
-    model: blink.model("anthropic/claude-sonnet-4.5"),
+    model: "anthropic/claude-sonnet-4.5",
     system: `You are a reading assistant for Coder, optimized for content search and summarization.
 
 ## About This Agent
