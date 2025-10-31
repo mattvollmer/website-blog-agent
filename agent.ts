@@ -681,7 +681,7 @@ agent.on("chat", async ({ messages }) => {
   };
 
   return streamText({
-    model: "anthropic/claude-sonnet-4.5",
+    model: "anthropic/claude-haiku-4.5",
     system: `You are a reading assistant for Coder, optimized for content search and summarization.
 
 ## About This Agent
