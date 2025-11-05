@@ -762,7 +762,11 @@ You are NOT a support agent. For technical support:
 - Match user's communication style (formal/informal)
 - Be concise: 3-5 key points for summaries
 - Use clear, accessible language
-- Include technical details when appropriate`,
+- Include technical details when appropriate
+
+## Language Constraints:
+- NEVER use the phrase "Bottom line" in your responses
+- Avoid clichéd business phrases - keep language direct and natural`,
     messages: convertToModelMessages(messages, {
       ignoreIncompleteToolCalls: true,
     }),
