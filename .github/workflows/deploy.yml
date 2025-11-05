@@ -24,10 +24,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Configure Blink authentication
-        run: |
-          mkdir -p ~/.config/blink
-          echo '{"token":"${{ secrets.BLINK_TOKEN }}"}' > ~/.config/blink/auth.json
-
       - name: Deploy agent
+        env:
+          BLINK_TOKEN: ${{ secrets.BLINK_TOKEN }}
         run: blink deploy -m "auto deploy"
