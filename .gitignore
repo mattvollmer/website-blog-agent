@@ -3,6 +3,7 @@ node_modules
 
 # config and build
 .blink
+!.blink/config.json
 
 # dotenv environment variables file
 .env
